@@ -4,7 +4,7 @@ import numpy as np
 from scipy.spatial import distance as dist
 
 # --- CONFIGURATION ---
-EAR_THRESHOLD = 0.22  
+EAR_THRESHOLD = 0.20 
 # We keep CONSECUTIVE_FRAMES at 1 for "instant" reading-stop response
 CONSECUTIVE_FRAMES = 1 
 
