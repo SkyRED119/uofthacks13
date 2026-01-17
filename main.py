@@ -2,6 +2,8 @@ from flask import Flask, jsonify, request
 from flask_cors import CORS
 import json
 from datetime import datetime
+from pypdf import PdfReader
+import io
 
 app = Flask(__name__)
 CORS(app)  # Enable CORS for all routes
@@ -36,6 +38,64 @@ def echo():
         "status": "success",
         "received": data
     })
+
+
+@app.route("/api/extract-pdf", methods=["POST"])
+def extract_pdf():
+    """Extract text from uploaded PDF file"""
+    print("📄 /api/extract-pdf endpoint called", flush=True)
+    try:
+        # Check if file is in request
+        if 'file' not in request.files:
+            return jsonify({
+                "status": "error",
+                "message": "No file provided"
+            }), 400
+        
+        file = request.files['file']
+        
+        if file.filename == '':
+            return jsonify({
+                "status": "error",
+                "message": "No file selected"
+            }), 400
+        
+        if not file.filename.endswith('.pdf'):
+            return jsonify({
+                "status": "error",
+                "message": "File is not a PDF"
+            }), 400
+        
+        # Read PDF
+        try:
+            pdf_reader = PdfReader(io.BytesIO(file.read()))
+            text = ""
+            
+            for page in pdf_reader.pages:
+                text += page.extract_text()
+            
+            print(f"📄 Extracted {len(text)} characters from PDF", flush=True)
+            
+            return jsonify({
+                "status": "success",
+                "text": text,
+                "file_name": file.filename,
+                "pages": len(pdf_reader.pages)
+            }), 200
+        
+        except Exception as e:
+            print(f"Error reading PDF: {str(e)}", flush=True)
+            return jsonify({
+                "status": "error",
+                "message": f"Failed to read PDF: {str(e)}"
+            }), 400
+    
+    except Exception as e:
+        print(f"Error in extract_pdf: {str(e)}", flush=True)
+        return jsonify({
+            "status": "error",
+            "message": str(e)
+        }), 400
 
 
 @app.route("/api/process-word", methods=["POST"])

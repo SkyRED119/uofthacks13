@@ -82,13 +82,22 @@ function setupFileUploadListeners() {
 }
 
 function handleFile(file) {
-    const validNames = file.name.endsWith(".txt") || file.name.endsWith(".md");
+    const isTxtOrMd = file.name.endsWith(".txt") || file.name.endsWith(".md");
+    const isPdf = file.name.endsWith(".pdf");
 
-    if (!validNames) {
-        showMessage("Please upload a .txt or .md file", "error");
+    if (!isTxtOrMd && !isPdf) {
+        showMessage("Please upload a .txt, .md, or .pdf file", "error");
         return;
     }
 
+    if (isPdf) {
+        handlePdf(file);
+    } else {
+        handleTxtOrMd(file);
+    }
+}
+
+function handleTxtOrMd(file) {
     const reader = new FileReader();
     reader.onload = (e) => {
         try {
@@ -113,6 +122,40 @@ function handleFile(file) {
         showMessage("Error reading file", "error");
     };
     reader.readAsText(file);
+}
+
+function handlePdf(file) {
+    const formData = new FormData();
+    formData.append("file", file);
+
+    fetch(`${API_BASE_URL}/api/extract-pdf`, {
+        method: "POST",
+        body: formData,
+    })
+        .then((response) => response.json())
+        .then((data) => {
+            if (data.status === "success") {
+                currentFileName = data.file_name;
+                parseText(data.text);
+                showMessage(`Loaded "${data.file_name}" - ${words.length} words found (${data.pages} pages)`, "success");
+                fileInfo.classList.add("show");
+                fileInfo.innerHTML = `<strong>${data.file_name}</strong><br>${words.length} words loaded from ${data.pages} pages`;
+                rsvpSection.classList.add("active");
+                document.getElementById("totalWords").textContent = words.length;
+
+                sendEventToBackend("file_uploaded", {
+                    file_name: data.file_name,
+                    word_count: words.length,
+                    pages: data.pages,
+                    file_type: "pdf",
+                });
+            } else {
+                showMessage("Error extracting PDF: " + data.message, "error");
+            }
+        })
+        .catch((error) => {
+            showMessage("Error uploading PDF: " + error.message, "error");
+        });
 }
 
 // ============================================================================

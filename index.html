@@ -118,7 +118,7 @@
             flex-direction: column;
             justify-content: center;
             align-items: center;
-            padding: 40px;
+            padding: 0 200px;
         }
 
         .rsvp-word {
@@ -141,7 +141,7 @@
 
         .word-part.before {
             text-align: right;
-            width: 200px;
+            width: 500px;
         }
 
         .word-part.focal {
@@ -154,8 +154,8 @@
 
         .word-part.after {
             text-align: left;
-            margin-left: 10px;
-            width: 200px;
+            margin-left: 15px;
+            width: 500px;
         }
 
         .rsvp-stats {
@@ -324,18 +324,18 @@
         <div class="main-content">
             <!-- File Upload Section -->
             <div class="section">
-                <h2>📤 Upload Your File</h2>
+                <h2>Upload Your File</h2>
                 <div class="file-upload-wrapper">
                     <input 
                         type="file" 
                         id="fileInput" 
                         class="file-input" 
-                        accept=".txt,.md"
+                        accept=".txt,.md,.pdf"
                     >
                     <label for="fileInput" class="file-upload-label">
                         <div style="font-size: 24px; margin-bottom: 10px;">📁</div>
-                        <div>Drag and drop a TXT or MD file here, or click to select</div>
-                        <div style="font-size: 12px; color: #999; margin-top: 10px;">Supported formats: .txt, .md</div>
+                        <div>Drag and drop a TXT, MD, or PDF file here, or click to select</div>
+                        <div style="font-size: 12px; color: #999; margin-top: 10px;">Supported formats: .txt, .md, .pdf</div>
                     </label>
                     <div id="fileInfo" class="file-info"></div>
                 </div>
@@ -343,7 +343,7 @@
 
             <!-- RSVP Display Section -->
             <div class="section rsvp-display-section" id="rsvpSection">
-                <h2>▶️ Reading Mode</h2>
+                <h2>Reading Mode</h2>
                 
                 <div class="progress-bar">
                     <div class="progress-fill" id="progressFill" style="width: 0%"></div>
@@ -363,14 +363,14 @@
 
                 <div class="controls">
                     <button class="start-button" id="startButton" onclick="startReading()">
-                        ▶️ START READING
+                        START READING
                     </button>
                 </div>
 
                 <div class="button-group">
-                    <button onclick="pauseReading()" id="pauseButton" disabled>⏸️ Pause</button>
-                    <button onclick="resumeReading()" id="resumeButton" disabled>▶️ Resume</button>
-                    <button onclick="resetReading()">🔄 Reset</button>
+                    <button onclick="pauseReading()" id="pauseButton" disabled>⏸ Pause</button>
+                    <button onclick="resumeReading()" id="resumeButton" disabled>▶ Resume</button>
+                    <button onclick="resetReading()">↻ Reset</button>
                 </div>
 
                 <div class="control-group">
