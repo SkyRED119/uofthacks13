@@ -306,6 +306,43 @@ function updateSpeed() {
 // BACKEND COMMUNICATION
 // ============================================================================
 
+async function processWordWithBackend(word) {
+    try {
+        const response = await fetch(`${API_BASE_URL}/api/process-word`, {
+            method: "POST",
+            headers: {
+                "Content-Type": "application/json",
+            },
+            body: JSON.stringify({ word: word }),
+        });
+
+        if (!response.ok) {
+            console.error("Failed to process word on backend");
+            renderWord("", word, "", 0);
+            return;
+        }
+
+        const data = await response.json();
+        renderWord(data.before, data.focal, data.after, data.focal_index);
+    } catch (error) {
+        console.error("Error processing word on backend:", error);
+        renderWord("", word, "", 0);
+    }
+}
+
+function renderWord(before, focal, after, focalIndex) {
+    const rsvpWordElement = document.getElementById("rsvpWord");
+    
+    // Build HTML for 3-part word
+    const html = `
+        <span class="word-part before">${before}</span><span class="word-part focal">${focal}</span><span class="word-part after">${after}</span>
+    `;
+    
+    rsvpWordElement.innerHTML = html;
+    // Focal letter is centered by the flexbox layout
+    rsvpWordElement.style.transform = 'translateX(0)';
+}
+
 async function sendEventToBackend(eventType, additionalData = {}) {
     try {
         const eventData = {

@@ -127,6 +127,29 @@
             font-family: 'Monaco', monospace;
             letter-spacing: 2px;
             line-height: 1;
+            position: relative;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            white-space: nowrap;
+        }
+
+        .word-part {
+            display: inline;
+        }
+
+        .word-part.before {
+            text-align: right;
+        }
+
+        .word-part.focal {
+            color: #ff4444;
+            font-weight: bold;
+            margin: 0 2px;
+        }
+
+        .word-part.after {
+            text-align: left;
         }
 
         .rsvp-stats {
