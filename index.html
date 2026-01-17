@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>UofTHacks 13 - Frontend</title>
+    <title>RSVP Reader - UofTHacks 13</title>
     <style>
         * {
             margin: 0;
@@ -15,49 +15,189 @@
             font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
             background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
             min-height: 100vh;
-            display: flex;
-            justify-content: center;
-            align-items: center;
             padding: 20px;
         }
 
         .container {
-            background: white;
-            border-radius: 10px;
-            box-shadow: 0 10px 40px rgba(0, 0, 0, 0.2);
-            padding: 40px;
-            max-width: 600px;
-            width: 100%;
+            max-width: 900px;
+            margin: 0 auto;
         }
 
         h1 {
-            color: #333;
-            margin-bottom: 30px;
+            color: white;
             text-align: center;
+            margin-bottom: 40px;
+            font-size: 2.5em;
+            text-shadow: 0 2px 10px rgba(0, 0, 0, 0.2);
+        }
+
+        .main-content {
+            background: white;
+            border-radius: 15px;
+            box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
+            padding: 40px;
         }
 
         .section {
-            margin-bottom: 30px;
+            margin-bottom: 40px;
         }
 
         .section h2 {
             color: #667eea;
-            font-size: 18px;
-            margin-bottom: 15px;
-            border-bottom: 2px solid #667eea;
+            font-size: 20px;
+            margin-bottom: 20px;
+            border-bottom: 3px solid #667eea;
             padding-bottom: 10px;
+        }
+
+        /* File Upload Styles */
+        .file-upload-wrapper {
+            position: relative;
+            margin-bottom: 20px;
+        }
+
+        .file-input {
+            display: none;
+        }
+
+        .file-upload-label {
+            display: block;
+            padding: 20px;
+            background: #f0f4ff;
+            border: 2px dashed #667eea;
+            border-radius: 8px;
+            text-align: center;
+            cursor: pointer;
+            transition: all 0.3s;
+        }
+
+        .file-upload-label:hover {
+            background: #e8edff;
+            border-color: #764ba2;
+        }
+
+        .file-upload-label.dragover {
+            background: #e8edff;
+            border-color: #764ba2;
+            transform: scale(1.02);
+        }
+
+        .file-info {
+            display: none;
+            margin-top: 15px;
+            padding: 15px;
+            background: #d4edda;
+            border-left: 4px solid #28a745;
+            border-radius: 5px;
+            color: #155724;
+        }
+
+        .file-info.show {
+            display: block;
+        }
+
+        /* RSVP Display */
+        .rsvp-display-section {
+            display: none;
+        }
+
+        .rsvp-display-section.active {
+            display: block;
+        }
+
+        .rsvp-container {
+            background: #f8f9fa;
+            border: 3px solid #667eea;
+            border-radius: 10px;
+            padding: 60px 40px;
+            text-align: center;
+            margin-bottom: 30px;
+            min-height: 200px;
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+        }
+
+        .rsvp-word {
+            font-size: 72px;
+            font-weight: bold;
+            color: #667eea;
+            font-family: 'Monaco', monospace;
+            letter-spacing: 2px;
+            line-height: 1;
+        }
+
+        .rsvp-stats {
+            color: #666;
+            font-size: 16px;
+            margin-top: 20px;
+        }
+
+        .rsvp-stats span {
+            font-weight: bold;
+            color: #667eea;
+        }
+
+        /* Controls */
+        .controls {
+            display: flex;
+            gap: 15px;
+            flex-wrap: wrap;
+            margin-bottom: 20px;
+            align-items: center;
+        }
+
+        .start-button {
+            flex: 1;
+            min-width: 250px;
+            padding: 20px;
+            background: #28a745;
+            color: white;
+            border: none;
+            border-radius: 8px;
+            font-size: 22px;
+            font-weight: bold;
+            cursor: pointer;
+            transition: all 0.3s;
+            box-shadow: 0 4px 15px rgba(40, 167, 69, 0.3);
+        }
+
+        .start-button:hover:not(:disabled) {
+            background: #218838;
+            transform: translateY(-2px);
+            box-shadow: 0 6px 20px rgba(40, 167, 69, 0.4);
+        }
+
+        .start-button:disabled {
+            background: #ccc;
+            cursor: not-allowed;
+        }
+
+        .control-group {
+            display: flex;
+            gap: 15px;
+            align-items: center;
+        }
+
+        .control-group label {
+            color: #333;
+            font-weight: bold;
+            white-space: nowrap;
+        }
+
+        .speed-slider {
+            width: 200px;
+            cursor: pointer;
         }
 
         .button-group {
             display: flex;
             gap: 10px;
-            margin-bottom: 20px;
             flex-wrap: wrap;
         }
 
         button {
-            flex: 1;
-            min-width: 150px;
             padding: 12px 20px;
             background: #667eea;
             color: white;
@@ -66,182 +206,411 @@
             font-size: 16px;
             cursor: pointer;
             transition: background 0.3s;
+            white-space: nowrap;
         }
 
         button:hover {
             background: #764ba2;
         }
 
-        button:active {
-            transform: scale(0.98);
+        button:disabled {
+            background: #ccc;
+            cursor: not-allowed;
         }
 
-        .input-group {
-            display: flex;
-            gap: 10px;
+        .hidden {
+            display: none;
+        }
+
+        .message {
+            padding: 15px;
+            border-radius: 5px;
             margin-bottom: 15px;
         }
 
-        input {
-            flex: 1;
-            padding: 12px;
-            border: 1px solid #ddd;
-            border-radius: 5px;
-            font-size: 16px;
-        }
-
-        input:focus {
-            outline: none;
-            border-color: #667eea;
-            box-shadow: 0 0 0 3px rgba(102, 126, 234, 0.1);
-        }
-
-        .output {
-            background: #f5f5f5;
-            border-left: 4px solid #667eea;
-            padding: 15px;
-            border-radius: 5px;
-            margin-top: 15px;
-            font-family: 'Monaco', 'Courier New', monospace;
-            font-size: 14px;
-            max-height: 300px;
-            overflow-y: auto;
-            word-break: break-all;
-        }
-
-        .output pre {
-            margin: 0;
-            color: #333;
-        }
-
-        .status {
-            display: inline-block;
-            padding: 5px 10px;
-            border-radius: 3px;
-            font-size: 12px;
-            font-weight: bold;
-            margin-top: 10px;
-        }
-
-        .status.loading {
-            background: #fff3cd;
-            color: #856404;
-        }
-
-        .status.success {
-            background: #d4edda;
-            color: #155724;
-        }
-
-        .status.error {
+        .message.error {
             background: #f8d7da;
             color: #721c24;
+            border: 1px solid #f5c6cb;
+        }
+
+        .message.success {
+            background: #d4edda;
+            color: #155724;
+            border: 1px solid #c3e6cb;
+        }
+
+        .progress-bar {
+            width: 100%;
+            height: 8px;
+            background: #e9ecef;
+            border-radius: 4px;
+            overflow: hidden;
+            margin-bottom: 20px;
+        }
+
+        .progress-fill {
+            height: 100%;
+            background: linear-gradient(90deg, #667eea, #764ba2);
+            transition: width 0.3s;
         }
     </style>
 </head>
 <body>
     <div class="container">
-        <h1>🚀 UofTHacks 13</h1>
+        <h1>📖 RSVP Reader</h1>
 
-        <!-- Health Check Section -->
-        <div class="section">
-            <h2>Health Check</h2>
-            <button onclick="checkHealth()">Check Backend</button>
-            <div id="healthOutput" class="output" style="display:none;">
-                <pre id="healthText"></pre>
+        <div class="main-content">
+            <!-- File Upload Section -->
+            <div class="section">
+                <h2>📤 Upload Your File</h2>
+                <div class="file-upload-wrapper">
+                    <input 
+                        type="file" 
+                        id="fileInput" 
+                        class="file-input" 
+                        accept=".txt,.md"
+                    >
+                    <label for="fileInput" class="file-upload-label">
+                        <div style="font-size: 24px; margin-bottom: 10px;">📁</div>
+                        <div>Drag and drop a TXT or MD file here, or click to select</div>
+                        <div style="font-size: 12px; color: #999; margin-top: 10px;">Supported formats: .txt, .md</div>
+                    </label>
+                    <div id="fileInfo" class="file-info"></div>
+                </div>
             </div>
-        </div>
 
-        <!-- Get Data Section -->
-        <div class="section">
-            <h2>Fetch Data</h2>
-            <button onclick="fetchData()">Get Data from API</button>
-            <div id="dataOutput" class="output" style="display:none;">
-                <pre id="dataText"></pre>
-            </div>
-        </div>
+            <!-- RSVP Display Section -->
+            <div class="section rsvp-display-section" id="rsvpSection">
+                <h2>▶️ Reading Mode</h2>
+                
+                <div class="progress-bar">
+                    <div class="progress-fill" id="progressFill" style="width: 0%"></div>
+                </div>
 
-        <!-- Echo/POST Section -->
-        <div class="section">
-            <h2>Send Data</h2>
-            <div class="input-group">
-                <input 
-                    type="text" 
-                    id="echoInput" 
-                    placeholder="Enter a message..." 
-                    onkeypress="handleKeyPress(event)"
-                >
-                <button onclick="sendData()">Send</button>
+                <div class="rsvp-container">
+                    <div class="rsvp-word" id="rsvpWord">Ready?</div>
+                    <div class="rsvp-stats">
+                        Word <span id="currentWord">0</span> of <span id="totalWords">0</span>
+                    </div>
+                </div>
+
+                <div class="controls">
+                    <button class="start-button" id="startButton" onclick="startReading()">
+                        ▶️ START READING
+                    </button>
+                </div>
+
+                <div class="button-group">
+                    <button onclick="pauseReading()" id="pauseButton" disabled>⏸️ Pause</button>
+                    <button onclick="resumeReading()" id="resumeButton" disabled>▶️ Resume</button>
+                    <button onclick="resetReading()">🔄 Reset</button>
+                </div>
+
+                <div class="control-group">
+                    <label for="speedSlider">Words Per Minute:</label>
+                    <input 
+                        type="range" 
+                        id="speedSlider" 
+                        class="speed-slider" 
+                        min="100" 
+                        max="1000" 
+                        value="300" 
+                        step="50"
+                        onchange="updateSpeed()"
+                    >
+                    <span id="speedDisplay">300</span>
+                </div>
             </div>
-            <div id="echoOutput" class="output" style="display:none;">
-                <pre id="echoText"></pre>
-            </div>
+
+            <!-- Messages -->
+            <div id="message" class="message" style="display: none;"></div>
         </div>
     </div>
 
     <script>
-        const API_BASE_URL = "http://localhost:5001";
+        let words = [];
+        let currentIndex = 0;
+        let isReading = false;
+        let isPaused = false;
+        let readingTimeout = null;
+        let wordsPerMinute = 300;
+        let currentFileName = "";
 
-        function showOutput(elementId, data, isError = false) {
-            const outputDiv = document.getElementById(elementId);
-            const textDiv = document.getElementById(elementId.replace("Output", "Text"));
-            outputDiv.style.display = "block";
-            textDiv.textContent = JSON.stringify(data, null, 2);
-        }
-
-        function hideOutput(elementId) {
-            document.getElementById(elementId).style.display = "none";
-        }
-
-        async function checkHealth() {
+        // Utility function to send events to backend
+        async function sendEventToBackend(eventType, additionalData = {}) {
             try {
-                const response = await fetch(`${API_BASE_URL}/`);
-                const data = await response.json();
-                showOutput("healthOutput", data);
-            } catch (error) {
-                showOutput("healthOutput", { error: error.message }, true);
-            }
-        }
-
-        async function fetchData() {
-            try {
-                const response = await fetch(`${API_BASE_URL}/api/data`);
-                const data = await response.json();
-                showOutput("dataOutput", data);
-            } catch (error) {
-                showOutput("dataOutput", { error: error.message }, true);
-            }
-        }
-
-        async function sendData() {
-            const input = document.getElementById("echoInput");
-            const message = input.value.trim();
-
-            if (!message) {
-                alert("Please enter a message");
-                return;
-            }
-
-            try {
-                const response = await fetch(`${API_BASE_URL}/api/echo`, {
+                const eventData = {
+                    event_type: eventType,
+                    wpm: wordsPerMinute,
+                    current_word_index: currentIndex,
+                    total_words: words.length,
+                    file_name: currentFileName,
+                    is_reading: isReading,
+                    is_paused: isPaused,
+                    ...additionalData
+                };
+                
+                const response = await fetch(`${API_BASE_URL}/api/event`, {
                     method: "POST",
                     headers: {
                         "Content-Type": "application/json",
                     },
-                    body: JSON.stringify({ message: message })
+                    body: JSON.stringify(eventData)
                 });
-                const data = await response.json();
-                showOutput("echoOutput", data);
-                input.value = "";
+                
+                if (!response.ok) {
+                    console.error("Failed to send event to backend");
+                }
             } catch (error) {
-                showOutput("echoOutput", { error: error.message }, true);
+                console.error("Error sending event to backend:", error);
             }
         }
 
-        function handleKeyPress(event) {
-            if (event.key === "Enter") {
-                sendData();
+        // File upload handling
+        const fileInput = document.getElementById('fileInput');
+        const fileLabel = document.querySelector('.file-upload-label');
+        const fileInfo = document.getElementById('fileInfo');
+        const rsvpSection = document.getElementById('rsvpSection');
+        const message = document.getElementById('message');
+
+        // Keyboard event handling
+        document.addEventListener('keydown', (e) => {
+            // Only handle keyboard shortcuts if reading mode is active or file is loaded
+            if (!rsvpSection.classList.contains('active')) return;
+
+            // Spacebar: Pause/Resume
+            if (e.code === 'Space') {
+                e.preventDefault();
+                if (isReading) {
+                    pauseReading();
+                } else if (isPaused) {
+                    resumeReading();
+                }
             }
+
+            // Arrow Up/Right: Increase WPM
+            if (e.code === 'ArrowUp' || e.code === 'ArrowRight') {
+                e.preventDefault();
+                const slider = document.getElementById('speedSlider');
+                const newValue = Math.min(1000, parseInt(slider.value) + 50);
+                slider.value = newValue;
+                updateSpeed();
+            }
+
+            // Arrow Down/Left: Decrease WPM
+            if (e.code === 'ArrowDown' || e.code === 'ArrowLeft') {
+                e.preventDefault();
+                const slider = document.getElementById('speedSlider');
+                const newValue = Math.max(100, parseInt(slider.value) - 50);
+                slider.value = newValue;
+                updateSpeed();
+            }
+
+            // Enter: Start reading
+            if (e.code === 'Enter') {
+                e.preventDefault();
+                const startButton = document.getElementById('startButton');
+                if (!startButton.disabled) {
+                    startReading();
+                }
+            }
+
+            // R: Reset
+            if (e.code === 'KeyR') {
+                e.preventDefault();
+                resetReading();
+            }
+        });
+
+        // Drag and drop
+        fileLabel.addEventListener('dragover', (e) => {
+            e.preventDefault();
+            fileLabel.classList.add('dragover');
+        });
+
+        fileLabel.addEventListener('dragleave', () => {
+            fileLabel.classList.remove('dragover');
+        });
+
+        fileLabel.addEventListener('drop', (e) => {
+            e.preventDefault();
+            fileLabel.classList.remove('dragover');
+            const files = e.dataTransfer.files;
+            if (files.length > 0) {
+                handleFile(files[0]);
+            }
+        });
+
+        // File input change
+        fileInput.addEventListener('change', (e) => {
+            if (e.target.files.length > 0) {
+                handleFile(e.target.files[0]);
+            }
+        });
+
+        function handleFile(file) {
+            // Validate file type
+            const validTypes = ['text/plain', 'text/markdown', 'application/x-markdown'];
+            const validNames = file.name.endsWith('.txt') || file.name.endsWith('.md');
+
+            if (!validNames) {
+                showMessage('Please upload a .txt or .md file', 'error');
+                return;
+            }
+
+            const reader = new FileReader();
+            reader.onload = (e) => {
+                try {
+                    currentFileName = file.name;
+                    const text = e.target.result;
+                    parseText(text);
+                    showMessage(`Loaded "${file.name}" - ${words.length} words found`, 'success');
+                    fileInfo.classList.add('show');
+                    fileInfo.innerHTML = `<strong>${file.name}</strong><br>${words.length} words loaded`;
+                    rsvpSection.classList.add('active');
+                    document.getElementById('totalWords').textContent = words.length;
+                    
+                    // Send file uploaded event to backend
+                    sendEventToBackend('file_uploaded', {
+                        file_name: file.name,
+                        word_count: words.length
+                    });
+                } catch (error) {
+                    showMessage('Error reading file: ' + error.message, 'error');
+                }
+            };
+            reader.onerror = () => {
+                showMessage('Error reading file', 'error');
+            };
+            reader.readAsText(file);
+        }
+
+        function parseText(text) {
+            // Split by whitespace and filter out empty strings
+            words = text
+                .split(/\s+/)
+                .filter(word => word.length > 0);
+        }
+
+        function showMessage(msg, type) {
+            message.textContent = msg;
+            message.className = `message ${type}`;
+            message.style.display = 'block';
+            if (type === 'success') {
+                setTimeout(() => {
+                    message.style.display = 'none';
+                }, 5000);
+            }
+        }
+
+        function startReading() {
+            if (words.length === 0) {
+                showMessage('Please upload a file first', 'error');
+                return;
+            }
+            isReading = true;
+            isPaused = false;
+            currentIndex = 0;
+            document.getElementById('startButton').disabled = true;
+            document.getElementById('pauseButton').disabled = false;
+            
+            // Send start reading event
+            sendEventToBackend('reading_started');
+            
+            displayNextWord();
+        }
+
+        function displayNextWord() {
+            if (!isReading || currentIndex >= words.length) {
+                if (currentIndex >= words.length) {
+                    isReading = false;
+                    document.getElementById('startButton').disabled = false;
+                    document.getElementById('pauseButton').disabled = true;
+                    document.getElementById('resumeButton').disabled = true;
+                    document.getElementById('rsvpWord').textContent = 'Finished!';
+                }
+                return;
+            }
+
+            const currentWord = words[currentIndex];
+            document.getElementById('rsvpWord').textContent = currentWord;
+            document.getElementById('currentWord').textContent = currentIndex + 1;
+            
+            const progress = ((currentIndex + 1) / words.length) * 100;
+            document.getElementById('progressFill').style.width = progress + '%';
+
+            currentIndex++;
+
+            // Calculate delay based on WPM
+            const delayMs = (60000 / wordsPerMinute);
+            
+            // Check for punctuation and add extra pause
+            let extraPause = 0;
+            if (currentWord.includes('.') || currentWord.includes('!') || currentWord.includes('?') || currentWord.includes(';') || currentWord.includes(':')) {
+                extraPause = 100; // 100ms pause for sentence-ending punctuation
+            } else if (currentWord.includes(',')) {
+                extraPause = 50; // 50ms pause for commas
+            }
+
+            readingTimeout = setTimeout(() => {
+                if (isReading) {
+                    displayNextWord();
+                }
+            }, delayMs + extraPause);
+        }
+
+        function pauseReading() {
+            if (isReading) {
+                isPaused = true;
+                isReading = false;
+                clearTimeout(readingTimeout);
+                document.getElementById('pauseButton').disabled = true;
+                document.getElementById('resumeButton').disabled = false;
+                
+                // Send pause event
+                sendEventToBackend('reading_paused');
+            }
+        }
+
+        function resumeReading() {
+            if (isPaused) {
+                isPaused = false;
+                isReading = true;
+                document.getElementById('pauseButton').disabled = false;
+                document.getElementById('resumeButton').disabled = true;
+                
+                // Send resume event
+                sendEventToBackend('reading_resumed');
+                
+                displayNextWord();
+            }
+        }
+
+        function resetReading() {
+            isReading = false;
+            isPaused = false;
+            currentIndex = 0;
+            clearTimeout(readingTimeout);
+            document.getElementById('rsvpWord').textContent = 'Ready?';
+            document.getElementById('currentWord').textContent = '0';
+            document.getElementById('progressFill').style.width = '0%';
+            document.getElementById('startButton').disabled = false;
+            document.getElementById('pauseButton').disabled = true;
+            document.getElementById('resumeButton').disabled = true;
+            
+            // Send reset event
+            sendEventToBackend('reading_reset');
+        }
+
+        function updateSpeed() {
+            wordsPerMinute = parseInt(document.getElementById('speedSlider').value);
+            document.getElementById('speedDisplay').textContent = wordsPerMinute;
+            
+            // Send speed change event
+            sendEventToBackend('wpm_changed', {
+                new_wpm: wordsPerMinute
+            });
         }
     </script>
 </body>
