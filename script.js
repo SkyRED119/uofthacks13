@@ -524,15 +524,22 @@ async function processWordWithBackend(word) {
 
         if (!response.ok) {
             console.error("Failed to process word on backend");
-            renderWord("", word, "", 0);
+            renderWordSimple(word);
             return;
         }
 
         const data = await response.json();
-        renderWord(data.before, data.focal, data.after, data.focal_index);
+        
+        // Check if we got valid parts from the backend
+        if (data.before !== undefined && data.focal !== undefined && data.after !== undefined) {
+            renderWord(data.before, data.focal, data.after, data.focal_index);
+        } else {
+            // Fallback to simple rendering if backend response is incomplete
+            renderWordSimple(word);
+        }
     } catch (error) {
         console.error("Error processing word on backend:", error);
-        renderWord("", word, "", 0);
+        renderWordSimple(word);
     }
 }
 
@@ -546,6 +553,25 @@ function renderWord(before, focal, after, focalIndex) {
     
     rsvpWordElement.innerHTML = html;
     // Focal letter is centered by the flexbox layout
+    rsvpWordElement.style.transform = 'translateX(0)';
+}
+
+function renderWordSimple(word) {
+    const rsvpWordElement = document.getElementById("rsvpWord");
+    
+    // If backend response is invalid, display the whole word
+    // Find the focal character (usually middle letter)
+    const focalIndex = Math.floor(word.length / 2);
+    const before = word.substring(0, focalIndex);
+    const focal = word[focalIndex];
+    const after = word.substring(focalIndex + 1);
+    
+    // Build HTML for 3-part word
+    const html = `
+        <span class="word-part before">${before}</span><span class="word-part focal">${focal}</span><span class="word-part after">${after}</span>
+    `;
+    
+    rsvpWordElement.innerHTML = html;
     rsvpWordElement.style.transform = 'translateX(0)';
 }
 
