@@ -604,6 +604,20 @@ async function sendEventToBackend(eventType, additionalData = {}) {
     }
 }
 
+setInterval(async () => {
+  const res = await fetch("http://localhost:5000/blink_state");
+  const data = await res.json();
+
+  if (data.state === "closed" && !isPaused) {
+    pauseReading();
+  }
+
+  if (data.state === "open" && isPaused) {
+    resumeReading();
+  }
+}, 50); // 20 FPS, feels instant
+
+
 // ============================================================================
 // UI UTILITIES
 // ============================================================================

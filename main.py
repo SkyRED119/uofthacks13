@@ -8,6 +8,8 @@ import io
 app = Flask(__name__)
 CORS(app)  # Enable CORS for all routes
 
+blink_state = "open"
+
 # In-memory storage for events 
 events = []
 # NOTE TO SELF: In production, consider using a database for persistent storage.
@@ -195,6 +197,16 @@ def clear_events():
         "status": "success",
         "message": "All events cleared"
     })
+
+@app.route("/blink", methods=["POST"])
+def update_blink():
+    global blink_state
+    blink_state = request.json["state"]
+    return jsonify({"status": "ok"})
+
+@app.route("/blink_state", methods=["GET"])
+def get_blink_state():
+    return jsonify({"state": blink_state})
 
 
 def main():

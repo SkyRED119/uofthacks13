@@ -2,6 +2,7 @@ import cv2
 import mediapipe as mp
 import numpy as np
 from scipy.spatial import distance as dist
+import requests
 
 # --- CONFIGURATION ---
 EAR_THRESHOLD = 0.20 
@@ -53,7 +54,7 @@ while cap.isOpened():
                 blink_counter += 1
                 eyes_already_closed = True 
                 print(f"[ACTION] Eyes Closed! Total Blinks: {blink_counter}")
-                # Place your "Stop Reading / Pause" function call here
+                requests.post("http://localhost:5000/blink", json={"state": "closed"})
             
             status_color = (0, 0, 255) # Red for "Closed"
             status_text = "EYES CLOSED - READING PAUSED"
@@ -65,6 +66,7 @@ while cap.isOpened():
             
             status_color = (0, 255, 0) # Green for "Open"
             status_text = "EYES OPEN - READING ACTIVE"
+            requests.post("http://localhost:5000/blink", json={"state": "open"})
 
         # Visual Feedback for the App
         cv2.putText(frame, status_text, (30, 50), 0, 0.8, status_color, 2)
