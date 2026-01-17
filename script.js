@@ -299,18 +299,82 @@ function updateContextDisplay() {
     
     const contextWords = words.slice(start, end);
     
-    // Build HTML with current word highlighted
+    // Build HTML with current word highlighted and other words clickable
     const html = contextWords
         .map((word, idx) => {
             const actualIndex = start + idx;
             if (actualIndex === currentIndex) {
                 return `<span class="current-word">${word}</span>`;
             }
-            return word;
+            return `<span class="clickable-word" onclick="jumpToWord(${actualIndex})" title="Click to jump to this word">${word}</span>`;
         })
         .join(" ");
     
     document.getElementById("contextText").innerHTML = html;
+}
+
+function jumpToWord(index) {
+    if (index < 0 || index >= words.length) {
+        return;
+    }
+    currentIndex = index;
+    clearTimeout(readingTimeout);
+    
+    // Update the display without resuming reading
+    processWordWithBackend(words[index]);
+    updateContextDisplay();
+    document.getElementById("currentWord").textContent = index + 1;
+    document.getElementById("progressFill").style.width = ((index + 1) / words.length) * 100 + "%";
+    
+    sendEventToBackend("word_jumped", {
+        word_index: index,
+        word: words[index],
+    });
+}
+
+function searchNextWord() {
+    const searchTerm = document.getElementById("searchInput").value.toLowerCase().trim();
+    const searchMessage = document.getElementById("searchMessage");
+    
+    if (!searchTerm) {
+        searchMessage.textContent = "Please enter a word to search";
+        searchMessage.style.color = "#fca5a5";
+        return;
+    }
+    
+    // Search from the next position onwards
+    let foundIndex = -1;
+    for (let i = currentIndex + 1; i < words.length; i++) {
+        if (words[i].toLowerCase().includes(searchTerm)) {
+            foundIndex = i;
+            break;
+        }
+    }
+    
+    // If not found in remaining words, wrap around to the beginning
+    if (foundIndex === -1) {
+        for (let i = 0; i <= currentIndex; i++) {
+            if (words[i].toLowerCase().includes(searchTerm)) {
+                foundIndex = i;
+                break;
+            }
+        }
+    }
+    
+    if (foundIndex !== -1) {
+        jumpToWord(foundIndex);
+        searchMessage.textContent = `Found "${searchTerm}" in "${words[foundIndex]}" at word ${foundIndex + 1} of ${words.length}`;
+        searchMessage.style.color = "#86efac";
+        
+        sendEventToBackend("word_searched", {
+            search_term: searchTerm,
+            word_index: foundIndex,
+            word: words[foundIndex],
+        });
+    } else {
+        searchMessage.textContent = `"${searchTerm}" not found in document`;
+        searchMessage.style.color = "#fca5a5";
+    }
 }
 
 function displayNextWord() {

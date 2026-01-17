@@ -315,6 +315,77 @@
             padding: 2px 6px;
             border-radius: 3px;
         }
+
+        .context-text .clickable-word {
+            cursor: pointer;
+            transition: all 0.2s;
+            padding: 2px 4px;
+            border-radius: 3px;
+        }
+
+        .context-text .clickable-word:hover {
+            color: #a8b0d4;
+            background: rgba(168, 176, 212, 0.15);
+            text-decoration: underline;
+        }
+
+        /* Search Bar Styles */
+        .search-group {
+            display: flex;
+            gap: 10px;
+            align-items: center;
+            margin-bottom: 20px;
+        }
+
+        .search-group label {
+            color: #b0b8d4;
+            font-weight: bold;
+            white-space: nowrap;
+        }
+
+        .search-group input {
+            flex: 1;
+            padding: 10px 15px;
+            background: #252c47;
+            border: 1px solid #8892b8;
+            border-radius: 5px;
+            color: #d4d8ec;
+            font-family: 'Monaco', monospace;
+            font-size: 14px;
+        }
+
+        .search-group input:focus {
+            outline: none;
+            border-color: #a8b0d4;
+            box-shadow: 0 0 0 2px rgba(168, 176, 212, 0.1);
+        }
+
+        .search-group button {
+            padding: 10px 20px;
+            background: #c80808;
+            color: white;
+            border: none;
+            border-radius: 5px;
+            font-size: 14px;
+            cursor: pointer;
+            transition: background 0.3s;
+            white-space: nowrap;
+        }
+
+        .search-group button:hover {
+            background: #d04848;
+        }
+
+        .search-group button:disabled {
+            background: #4b5563;
+            cursor: not-allowed;
+        }
+
+        #searchMessage {
+            font-size: 12px;
+            color: #7a8899;
+            margin-top: 5px;
+        }
     </style>
 </head>
 <body>
@@ -386,6 +457,18 @@
                         onchange="updateSpeed()"
                     >
                     <span id="speedDisplay">300</span>
+                </div>
+
+                <!-- Search Bar -->
+                <div class="search-group">
+                    <label for="searchInput">Search Word:</label>
+                    <input 
+                        type="text" 
+                        id="searchInput" 
+                        placeholder="Enter a word to find..."
+                    >
+                    <button onclick="searchNextWord()">Find Next</button>
+                    <div id="searchMessage"></div>
                 </div>
             </div>
 
