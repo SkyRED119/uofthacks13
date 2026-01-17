@@ -178,6 +178,17 @@ function setupKeyboardListeners() {
         // Only handle keyboard shortcuts if reading mode is active or file is loaded
         if (!rsvpSection.classList.contains("active")) return;
 
+        // Don't intercept keyboard shortcuts if the search input is focused
+        const searchInput = document.getElementById("searchInput");
+        if (document.activeElement === searchInput) {
+            // Only allow Enter to trigger search while in the search bar
+            if (e.code === "Enter") {
+                e.preventDefault();
+                searchNextWord();
+            }
+            return;
+        }
+
         // Spacebar: Pause/Resume
         if (e.code === "Space") {
             e.preventDefault();
@@ -239,6 +250,12 @@ function startReading() {
     document.getElementById("startButton").disabled = true;
     document.getElementById("pauseButton").disabled = false;
 
+    // Auto-play music
+    const musicPlayer = document.getElementById("musicPlayer");
+    if (musicPlayer) {
+        musicPlayer.play().catch(err => console.log("Music autoplay not allowed or no music loaded"));
+    }
+
     sendEventToBackend("reading_started");
 
     displayNextWord();
@@ -252,6 +269,12 @@ function pauseReading() {
         document.getElementById("pauseButton").disabled = true;
         document.getElementById("resumeButton").disabled = false;
 
+        // Pause music
+        const musicPlayer = document.getElementById("musicPlayer");
+        if (musicPlayer) {
+            musicPlayer.pause();
+        }
+
         sendEventToBackend("reading_paused");
     }
 }
@@ -262,6 +285,12 @@ function resumeReading() {
         isReading = true;
         document.getElementById("pauseButton").disabled = false;
         document.getElementById("resumeButton").disabled = true;
+
+        // Resume music
+        const musicPlayer = document.getElementById("musicPlayer");
+        if (musicPlayer) {
+            musicPlayer.play().catch(err => console.log("Music autoplay not allowed or no music loaded"));
+        }
 
         sendEventToBackend("reading_resumed");
 
@@ -283,7 +312,36 @@ function resetReading() {
     document.getElementById("pauseButton").disabled = true;
     document.getElementById("resumeButton").disabled = true;
 
+    // Pause music
+    const musicPlayer = document.getElementById("musicPlayer");
+    if (musicPlayer) {
+        musicPlayer.pause();
+        musicPlayer.currentTime = 0;
+    }
+
     sendEventToBackend("reading_reset");
+}
+
+function loadCustomMusic(event) {
+    const file = event.target.files[0];
+    if (!file) return;
+
+    const musicPlayer = document.getElementById("musicPlayer");
+    const fileURL = URL.createObjectURL(file);
+    
+    // Remove old source and add new one
+    const sources = musicPlayer.getElementsByTagName("source");
+    if (sources.length > 0) {
+        sources[0].src = fileURL;
+    } else {
+        const source = document.createElement("source");
+        source.type = file.type;
+        source.src = fileURL;
+        musicPlayer.appendChild(source);
+    }
+    
+    musicPlayer.load();
+    showMessage(`Loaded custom music: ${file.name}`, "success");
 }
 
 // ============================================================================
@@ -338,6 +396,13 @@ function searchNextWord() {
     
     if (!searchTerm) {
         searchMessage.textContent = "Please enter a word to search";
+        searchMessage.style.color = "#fca5a5";
+        return;
+    }
+    
+    // Check if search term contains spaces
+    if (searchTerm.includes(" ")) {
+        searchMessage.textContent = "Please search for only one word at a time. Multiple words are not supported.";
         searchMessage.style.color = "#fca5a5";
         return;
     }
