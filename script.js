@@ -15,6 +15,7 @@ let isPaused = false;
 let readingTimeout = null;
 let wordsPerMinute = 300;
 let currentFileName = "";
+let previewHistory = []; // Track previous words for preview
 
 // ============================================================================
 // DOM ELEMENTS
@@ -229,10 +230,12 @@ function resetReading() {
     isReading = false;
     isPaused = false;
     currentIndex = 0;
+    previewHistory = [];
     clearTimeout(readingTimeout);
     document.getElementById("rsvpWord").textContent = "Ready?";
     document.getElementById("currentWord").textContent = "0";
     document.getElementById("progressFill").style.width = "0%";
+    document.getElementById("contextText").innerHTML = "";
     document.getElementById("startButton").disabled = false;
     document.getElementById("pauseButton").disabled = true;
     document.getElementById("resumeButton").disabled = true;
@@ -243,6 +246,29 @@ function resetReading() {
 // ============================================================================
 // WORD DISPLAY AND TIMING
 // ============================================================================
+
+function updateContextDisplay() {
+    const contextRadius = 10; // Show 10 words before and after
+
+    // Get surrounding words
+    const start = Math.max(0, currentIndex - contextRadius);
+    const end = Math.min(words.length, currentIndex + contextRadius + 1);
+    
+    const contextWords = words.slice(start, end);
+    
+    // Build HTML with current word highlighted
+    const html = contextWords
+        .map((word, idx) => {
+            const actualIndex = start + idx;
+            if (actualIndex === currentIndex) {
+                return `<span class="current-word">${word}</span>`;
+            }
+            return word;
+        })
+        .join(" ");
+    
+    document.getElementById("contextText").innerHTML = html;
+}
 
 function displayNextWord() {
     if (!isReading || currentIndex >= words.length) {
@@ -263,13 +289,21 @@ function displayNextWord() {
     const progress = ((currentIndex + 1) / words.length) * 100;
     document.getElementById("progressFill").style.width = progress + "%";
 
+    // Update preview and postview
+    updateContextDisplay();
+
     currentIndex++;
+
+    // Send word to backend for processing
+    processWordWithBackend(currentWord);
 
     // Calculate delay based on WPM
     const delayMs = 60000 / wordsPerMinute;
 
     // Check for punctuation and add extra pause
-    let extraPause = 0;
+    // Also increases the pause with longer words
+    let extraPause = (currentWord.length * (delayMs / 1000)) * currentWord.length; // Exponential increase
+
     if (
         currentWord.includes(".") ||
         currentWord.includes("!") ||
@@ -277,9 +311,9 @@ function displayNextWord() {
         currentWord.includes(";") ||
         currentWord.includes(":")
     ) {
-        extraPause = 100; // 100ms pause for sentence-ending punctuation
+        extraPause += 100; // 100ms pause for sentence-ending punctuation
     } else if (currentWord.includes(",")) {
-        extraPause = 50; // 50ms pause for commas
+        extraPause += 50; // 50ms pause for commas
     }
 
     readingTimeout = setTimeout(() => {

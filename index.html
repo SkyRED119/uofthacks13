@@ -118,6 +118,7 @@
             flex-direction: column;
             justify-content: center;
             align-items: center;
+            padding: 40px;
         }
 
         .rsvp-word {
@@ -135,21 +136,26 @@
         }
 
         .word-part {
-            display: inline;
+            display: inline-block;   
         }
 
         .word-part.before {
             text-align: right;
+            width: 200px;
         }
 
         .word-part.focal {
             color: #ff4444;
             font-weight: bold;
-            margin: 0 2px;
+            width: 30px;
+            text-align: center;
+            flex-shrink: 0;
         }
 
         .word-part.after {
             text-align: left;
+            margin-left: 10px;
+            width: 200px;
         }
 
         .rsvp-stats {
@@ -284,6 +290,31 @@
             background: linear-gradient(90deg, #c80808, #fafdfc);
             transition: width 0.3s;
         }
+
+        /* Preview/Postview Styles */
+        .word-context {
+            margin-top: 30px;
+            padding: 20px;
+            background: rgba(40, 45, 70, 0.3);
+            border-radius: 10px;
+        }
+
+        .context-text {
+            color: #7a8899;
+            font-size: 14px;
+            line-height: 1.8;
+            font-family: 'Monaco', monospace;
+            text-align: center;
+            word-break: break-word;
+        }
+
+        .context-text .current-word {
+            color: #ff4444;
+            font-weight: bold;
+            background: rgba(255, 68, 68, 0.1);
+            padding: 2px 6px;
+            border-radius: 3px;
+        }
     </style>
 </head>
 <body>
@@ -323,6 +354,11 @@
                     <div class="rsvp-stats">
                         Word <span id="currentWord">0</span> of <span id="totalWords">0</span>
                     </div>
+                </div>
+
+                <!-- Preview/Postview Section -->
+                <div class="word-context">
+                    <div class="context-text" id="contextText"></div>
                 </div>
 
                 <div class="controls">
