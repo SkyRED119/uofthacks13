@@ -1,0 +1,8 @@
+README.md
+main.py
+pyproject.toml
+uofthacks13.egg-info/PKG-INFO
+uofthacks13.egg-info/SOURCES.txt
+uofthacks13.egg-info/dependency_links.txt
+uofthacks13.egg-info/requires.txt
+uofthacks13.egg-info/top_level.txt

@@ -1,0 +1,8 @@
+Metadata-Version: 2.4
+Name: uofthacks13
+Version: 0.1.0
+Summary: Add your description here
+Requires-Python: >=3.9
+Description-Content-Type: text/markdown
+Requires-Dist: flask>=2.3.0
+Requires-Dist: flask-cors>=4.0.0

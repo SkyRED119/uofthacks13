@@ -1,0 +1,248 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>UofTHacks 13 - Frontend</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            padding: 20px;
+        }
+
+        .container {
+            background: white;
+            border-radius: 10px;
+            box-shadow: 0 10px 40px rgba(0, 0, 0, 0.2);
+            padding: 40px;
+            max-width: 600px;
+            width: 100%;
+        }
+
+        h1 {
+            color: #333;
+            margin-bottom: 30px;
+            text-align: center;
+        }
+
+        .section {
+            margin-bottom: 30px;
+        }
+
+        .section h2 {
+            color: #667eea;
+            font-size: 18px;
+            margin-bottom: 15px;
+            border-bottom: 2px solid #667eea;
+            padding-bottom: 10px;
+        }
+
+        .button-group {
+            display: flex;
+            gap: 10px;
+            margin-bottom: 20px;
+            flex-wrap: wrap;
+        }
+
+        button {
+            flex: 1;
+            min-width: 150px;
+            padding: 12px 20px;
+            background: #667eea;
+            color: white;
+            border: none;
+            border-radius: 5px;
+            font-size: 16px;
+            cursor: pointer;
+            transition: background 0.3s;
+        }
+
+        button:hover {
+            background: #764ba2;
+        }
+
+        button:active {
+            transform: scale(0.98);
+        }
+
+        .input-group {
+            display: flex;
+            gap: 10px;
+            margin-bottom: 15px;
+        }
+
+        input {
+            flex: 1;
+            padding: 12px;
+            border: 1px solid #ddd;
+            border-radius: 5px;
+            font-size: 16px;
+        }
+
+        input:focus {
+            outline: none;
+            border-color: #667eea;
+            box-shadow: 0 0 0 3px rgba(102, 126, 234, 0.1);
+        }
+
+        .output {
+            background: #f5f5f5;
+            border-left: 4px solid #667eea;
+            padding: 15px;
+            border-radius: 5px;
+            margin-top: 15px;
+            font-family: 'Monaco', 'Courier New', monospace;
+            font-size: 14px;
+            max-height: 300px;
+            overflow-y: auto;
+            word-break: break-all;
+        }
+
+        .output pre {
+            margin: 0;
+            color: #333;
+        }
+
+        .status {
+            display: inline-block;
+            padding: 5px 10px;
+            border-radius: 3px;
+            font-size: 12px;
+            font-weight: bold;
+            margin-top: 10px;
+        }
+
+        .status.loading {
+            background: #fff3cd;
+            color: #856404;
+        }
+
+        .status.success {
+            background: #d4edda;
+            color: #155724;
+        }
+
+        .status.error {
+            background: #f8d7da;
+            color: #721c24;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>🚀 UofTHacks 13</h1>
+
+        <!-- Health Check Section -->
+        <div class="section">
+            <h2>Health Check</h2>
+            <button onclick="checkHealth()">Check Backend</button>
+            <div id="healthOutput" class="output" style="display:none;">
+                <pre id="healthText"></pre>
+            </div>
+        </div>
+
+        <!-- Get Data Section -->
+        <div class="section">
+            <h2>Fetch Data</h2>
+            <button onclick="fetchData()">Get Data from API</button>
+            <div id="dataOutput" class="output" style="display:none;">
+                <pre id="dataText"></pre>
+            </div>
+        </div>
+
+        <!-- Echo/POST Section -->
+        <div class="section">
+            <h2>Send Data</h2>
+            <div class="input-group">
+                <input 
+                    type="text" 
+                    id="echoInput" 
+                    placeholder="Enter a message..." 
+                    onkeypress="handleKeyPress(event)"
+                >
+                <button onclick="sendData()">Send</button>
+            </div>
+            <div id="echoOutput" class="output" style="display:none;">
+                <pre id="echoText"></pre>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        const API_BASE_URL = "http://localhost:5001";
+
+        function showOutput(elementId, data, isError = false) {
+            const outputDiv = document.getElementById(elementId);
+            const textDiv = document.getElementById(elementId.replace("Output", "Text"));
+            outputDiv.style.display = "block";
+            textDiv.textContent = JSON.stringify(data, null, 2);
+        }
+
+        function hideOutput(elementId) {
+            document.getElementById(elementId).style.display = "none";
+        }
+
+        async function checkHealth() {
+            try {
+                const response = await fetch(`${API_BASE_URL}/`);
+                const data = await response.json();
+                showOutput("healthOutput", data);
+            } catch (error) {
+                showOutput("healthOutput", { error: error.message }, true);
+            }
+        }
+
+        async function fetchData() {
+            try {
+                const response = await fetch(`${API_BASE_URL}/api/data`);
+                const data = await response.json();
+                showOutput("dataOutput", data);
+            } catch (error) {
+                showOutput("dataOutput", { error: error.message }, true);
+            }
+        }
+
+        async function sendData() {
+            const input = document.getElementById("echoInput");
+            const message = input.value.trim();
+
+            if (!message) {
+                alert("Please enter a message");
+                return;
+            }
+
+            try {
+                const response = await fetch(`${API_BASE_URL}/api/echo`, {
+                    method: "POST",
+                    headers: {
+                        "Content-Type": "application/json",
+                    },
+                    body: JSON.stringify({ message: message })
+                });
+                const data = await response.json();
+                showOutput("echoOutput", data);
+                input.value = "";
+            } catch (error) {
+                showOutput("echoOutput", { error: error.message }, true);
+            }
+        }
+
+        function handleKeyPress(event) {
+            if (event.key === "Enter") {
+                sendData();
+            }
+        }
+    </script>
+</body>
+</html>
