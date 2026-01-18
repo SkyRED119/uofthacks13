@@ -1,25 +1,38 @@
-from flask import Flask, jsonify, request
+from flask import Flask, jsonify, request, send_from_directory
 from flask_cors import CORS
 import json
 from datetime import datetime
+import time
 from pypdf import PdfReader
 import io
 from langdetect import detect
 import os
-from elevenlabs import Voice, VoiceSettings
-from elevenlabs.client import ElevenLabs
+from elevenlabs import ElevenLabs
 
 app = Flask(__name__)
-CORS(app)  # Enable CORS for all routes
+CORS(app)
 
-client = ElevenLabs(api_key=os.getenv("ELEVENLABS_API_KEY"))
+# Initialize ElevenLabs client
+# OPTION 1: Set your API key directly here for testing
+ELEVENLABS_API_KEY = os.getenv("ELEVENLABS_API_KEY") or "sk_c1a0a1014143028ce56521b3208df19ac5a7d7b52c82aadb"
+
+# Check if key is set
+if not ELEVENLABS_API_KEY or ELEVENLABS_API_KEY == "YOUR_API_KEY_HERE":
+    print("⚠️  WARNING: ELEVENLABS_API_KEY not set! TTS will not work.")
+    print("   Set it with: export ELEVENLABS_API_KEY='your_key_here'")
+    print("   Or replace YOUR_API_KEY_HERE in main.py")
+    client = None
+else:
+    print(f"✅ ElevenLabs API key loaded: {ELEVENLABS_API_KEY[:10]}...")
+    client = ElevenLabs(api_key=ELEVENLABS_API_KEY)
 
 blink_state = "open"
-current_direction = "ltr" # Default text direction is left-to-right
+current_direction = "ltr"
 
-# In-memory storage for events 
 events = []
-# NOTE TO SELF: In production, consider using a database for persistent storage.
+
+# Create static directory
+os.makedirs('static', exist_ok=True)
 
 
 @app.route("/", methods=["GET"])
@@ -54,21 +67,8 @@ def extract_pdf():
     global current_direction
     """Extract text from uploaded PDF file"""
     print("📄 /api/extract-pdf endpoint called", flush=True)
-    text = ""
     
-    for page in pdf_reader.pages:
-        text += page.extract_text()
-
-        # Detect language of the whole text block
-        try:
-            lang = detect(text)
-            # Arabic (ar), Hebrew (he), Persian (fa), Urdu (ur) are RTL
-            current_direction = "rtl" if lang in ['ar', 'he', 'fa', 'ur'] else "ltr"
-        except:
-            current_direction = "ltr"
-
     try:
-        # Check if file is in request
         if 'file' not in request.files:
             return jsonify({
                 "status": "error",
@@ -89,13 +89,18 @@ def extract_pdf():
                 "message": "File is not a PDF"
             }), 400
         
-        # Read PDF
         try:
             pdf_reader = PdfReader(io.BytesIO(file.read()))
             text = ""
             
             for page in pdf_reader.pages:
                 text += page.extract_text()
+
+            try:
+                lang = detect(text)
+                current_direction = "rtl" if lang in ['ar', 'he', 'fa', 'ur'] else "ltr"
+            except:
+                current_direction = "ltr"
             
             print(f"📄 Extracted {len(text)} characters from PDF", flush=True)
             
@@ -125,7 +130,7 @@ def extract_pdf():
 @app.route("/api/process-word", methods=["POST"])
 def process_word():
     """Process a word and partition it around focal letter"""
-    print("📝 /api/process-word endpoint called", flush=True)
+    print("🔍 /api/process-word endpoint called", flush=True)
     try:
         data = request.get_json()
         word = data.get('word', '')
@@ -136,10 +141,8 @@ def process_word():
                 "message": "No word provided"
             }), 400
         
-        # Calculate focal letter index
         focal_index = calculate_focal_index(word)
         
-        # Partition the word
         before = word[:focal_index]
         focal = word[focal_index]
         after = word[focal_index + 1:]
@@ -174,16 +177,99 @@ def calculate_focal_index(word):
     return random.randint(min_middle, max_middle)
 
 
+@app.route("/api/generate-tts", methods=["POST"])
+def generate_tts():
+    """Generate TTS audio with word-level timestamps"""
+    print("🎙️ /api/generate-tts endpoint called", flush=True)
+    
+    data = request.get_json()
+    text = data.get('text', '')
+    user_wpm = data.get('wpm', 300)
+    
+    if not text:
+        return jsonify({
+            "status": "error",
+            "error": "No text provided"
+        }), 400
+    
+    # Check if client is initialized
+    if client is None:
+        print("❌ ElevenLabs client not initialized - API key missing!", flush=True)
+        return jsonify({
+            "status": "error",
+            "error": "ElevenLabs API key not configured. Please set ELEVENLABS_API_KEY environment variable or update main.py"
+        }), 500
+    
+    # Calculate speaking rate based on WPM
+    # 150 WPM ≈ 1.0 speed, 300 WPM ≈ 2.0 speed
+    speaking_rate = max(0.5, min(4.0, user_wpm / 150))
+    
+    try:
+        print(f"Generating TTS at {speaking_rate}x speed for {user_wpm} WPM", flush=True)
+        print(f"Text length: {len(text)} characters, {len(text.split())} words", flush=True)
+        
+        # Split text into words for alignment
+        words = text.split()
+        
+        # Generate audio using ElevenLabs - correct method for newer SDK
+        audio_generator = client.text_to_speech.convert(
+            text=text,
+            voice_id="pqHfZKP75CvOlQylNhV4",  # Bill voice ID
+            model_id="eleven_turbo_v2_5"
+        )
+        
+        # Collect audio bytes
+        audio_bytes = b""
+        for chunk in audio_generator:
+            audio_bytes += chunk
+        
+        # Save audio file
+        audio_path = "static/speech.mp3"
+        with open(audio_path, "wb") as f:
+            f.write(audio_bytes)
+        
+        print(f"✅ Audio saved to {audio_path} ({len(audio_bytes)} bytes)", flush=True)
+        
+        # Create synthetic alignment data based on WPM
+        # This is a fallback since we don't have real timestamps
+        ms_per_word = (60 / user_wpm) * 1000
+        alignment = []
+        current_time = 0
+        
+        for word in words:
+            # Adjust duration based on word length
+            word_duration = ms_per_word * (1 + (len(word) - 5) * 0.05)
+            alignment.append({
+                "word": word,
+                "start_time_ms": current_time,
+                "end_time_ms": current_time + word_duration
+            })
+            current_time += word_duration
+        
+        print(f"✅ Created {len(alignment)} synthetic alignments", flush=True)
+        
+        return jsonify({
+            "status": "success",
+            "audio_url": "/static/speech.mp3",
+            "alignment": alignment
+        }), 200
+    
+    except Exception as e:
+        print(f"❌ TTS Error: {str(e)}", flush=True)
+        import traceback
+        traceback.print_exc()
+        return jsonify({
+            "status": "error",
+            "error": str(e)
+        }), 500
+
+
 @app.route("/api/event", methods=["POST"])
 def log_event():
     """Log user events from the frontend"""
     try:
         data = request.get_json()
-        
-        # Add timestamp to the event
         data['timestamp'] = datetime.now().isoformat()
-        
-        # Store the event
         events.append(data)
         
         print(f"Event logged: {data['event_type']}")
@@ -220,50 +306,21 @@ def clear_events():
         "message": "All events cleared"
     })
 
+
 @app.route("/blink", methods=["POST"])
 def update_blink():
     global blink_state
     blink_state = request.json["state"]
     return jsonify({"status": "ok"})
 
+
 @app.route("/blink_state", methods=["GET"])
 def get_blink_state():
     return jsonify({"state": blink_state})
 
 
-@app.route("/api/generate-tts", methods=["POST"])
-def generate_tts():
-    data = request.get_json()
-    text = data.get('text', '')
-    user_wpm = data.get('wpm', 300)
-    
-    # Baseline: 150 WPM is ~1.0 speed. 300 WPM is 2.0 speed.
-    speaking_rate = max(0.5, min(2.0, user_wpm / 150))
-
-    try:
-        response = client.generate(
-            text=text,
-            voice=Voice(voice_id="EXAVIT97fihpW8w5XIyD"), # Bella voice
-            model="eleven_multilingual_v2",
-            voice_settings=VoiceSettings(speed=speaking_rate), # Syncs TTS speed to WPM
-            generation_config={"is_alignment_needed": True} # Critical for RSVP sync
-        )
-        
-        # Save the audio file to a folder named 'static'
-        audio_path = "static/speech.mp3"
-        with open(audio_path, "wb") as f:
-            for chunk in response.audio_stream:
-                f.write(chunk)
-
-        return jsonify({
-            "audio_url": f"http://localhost:5001/{audio_path}",
-            "alignment": response.alignment # List of [word, start_time_ms, end_time_ms]
-        })
-    except Exception as e:
-        return jsonify({"error": str(e)}), 500
-
 def main():
-    app.run(debug=True, host="0.0.0.0", port=5001)
+    app.run(debug=False, host="0.0.0.0", port=5001)
 
 
 if __name__ == "__main__":

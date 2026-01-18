@@ -161,7 +161,6 @@
         .word-part {
             display: inline-block;
             font-variant-ligatures: common-ligatures; 
-            /* Enable ligatures for languages that use them (e.g., Arabic, Hebrew) */
         }
 
         .word-part.before {
@@ -441,7 +440,41 @@
             min-width: 200px;
             accent-color: #c80808;
         }
-    </style>
+
+        /* TTS Toggle Styles */
+        .tts-toggle {
+            display: flex;
+            gap: 15px;
+            align-items: center;
+            margin-bottom: 20px;
+            padding: 15px;
+            background: rgba(40, 45, 70, 0.3);
+            border-radius: 8px;
+            border: 1px solid rgba(168, 176, 212, 0.2);
+        }
+
+        .tts-toggle label {
+            color: #b0b8d4;
+            font-weight: bold;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            cursor: pointer;
+        }
+
+        .tts-toggle input[type="checkbox"] {
+            width: 20px;
+            height: 20px;
+            cursor: pointer;
+            accent-color: #c80808;
+        }
+
+        #ttsStatus {
+            margin-left: 10px;
+            font-size: 12px;
+            color: #7a8899;
+        }
+    </style>   
 </head>
 <body>
     <div class="container">
@@ -512,6 +545,24 @@
                         onchange="updateSpeed()"
                     >
                     <span id="speedDisplay">300</span>
+                </div>
+
+                <!-- TTS Toggle -->
+                <div class="tts-toggle">
+                    <label for="ttsToggle">
+                        <input 
+                            type="checkbox" 
+                            id="ttsToggle"
+                        >
+                        <span>🔊 Enable Text-to-Speech (Synced Reading)</span>
+                    </label>
+                    <span id="ttsStatus"></span>
+                </div>
+
+                <div class="debug-audio-controls" style="margin-top: 20px; padding: 15px; background: rgba(255,255,255,0.05); border-radius: 8px;">
+                    <p style="font-size: 14px; margin-bottom: 10px; color: #8892b8;">Manual Audio Access:</p>
+                    <a id="downloadAudio" href="http://localhost:5001/static/speech.mp3" target="_blank" style="color: #4ade80; text-decoration: underline; margin-right: 15px;">Open MP3 in New Tab</a>
+                    <button onclick="manualPlayTTS()" style="background: #252c47; padding: 5px 10px; font-size: 12px;">Force Play Local File</button>
                 </div>
 
                 <!-- Search Bar -->

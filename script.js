@@ -1,5 +1,5 @@
 // ============================================================================
-// RSVP Reader - Main Application Script
+// RSVP Reader - Main Application Script WITH TTS SUPPORT
 // ============================================================================
 
 const API_BASE_URL = "http://localhost:5001";
@@ -16,9 +16,11 @@ let manualPause = false;
 let readingTimeout = null;
 let wordsPerMinute = 300;
 let currentFileName = "";
-let previewHistory = []; // Track previous words for preview
-let audioAlignment = []; // Store [word, start_time, end_time]
+let previewHistory = [];
+let audioAlignment = [];
 let audioPlayer = new Audio();
+let ttsEnabled = false;
+let isTTSMode = false; // Track if we're in TTS-synced mode
 
 // ============================================================================
 // DOM ELEMENTS
@@ -50,6 +52,29 @@ function initializeElements() {
 function setupEventListeners() {
     setupFileUploadListeners();
     setupKeyboardListeners();
+    setupTTSToggle();
+}
+
+function setupTTSToggle() {
+    const ttsToggle = document.getElementById("ttsToggle");
+    const ttsStatus = document.getElementById("ttsStatus");
+    
+    ttsToggle.addEventListener("change", (e) => {
+        ttsEnabled = e.target.checked;
+        if (ttsEnabled) {
+            ttsStatus.textContent = "✓ TTS will be enabled on next start";
+            ttsStatus.style.color = "#86efac";
+        } else {
+            ttsStatus.textContent = "";
+            // If currently reading with TTS, stop it
+            if (isTTSMode && isReading) {
+                audioPlayer.pause();
+                audioPlayer.currentTime = 0;
+                isTTSMode = false;
+                showMessage("TTS disabled - switched to timer mode", "success");
+            }
+        }
+    });
 }
 
 // ============================================================================
@@ -117,12 +142,6 @@ function handleTxtOrMd(file) {
                 file_name: file.name,
                 word_count: words.length,
             });
-
-            if (data.direction === "rtl") {
-                document.querySelector(".rsvp-container").classList.add("rtl");
-            } else {
-                document.querySelector(".rsvp-container").classList.remove("rtl");
-            }
         } catch (error) {
             showMessage("Error reading file: " + error.message, "error");
         }
@@ -152,6 +171,12 @@ function handlePdf(file) {
                 rsvpSection.classList.add("active");
                 document.getElementById("totalWords").textContent = words.length;
 
+                if (data.direction === "rtl") {
+                    document.querySelector(".rsvp-container").classList.add("rtl");
+                } else {
+                    document.querySelector(".rsvp-container").classList.remove("rtl");
+                }
+
                 sendEventToBackend("file_uploaded", {
                     file_name: data.file_name,
                     word_count: words.length,
@@ -172,7 +197,6 @@ function handlePdf(file) {
 // ============================================================================
 
 function parseText(text) {
-    // Split by whitespace, dashes, or em dashes and filter out empty strings
     words = text
         .split(/[\s\-—]+/)
         .filter((word) => word.length > 0);
@@ -184,13 +208,10 @@ function parseText(text) {
 
 function setupKeyboardListeners() {
     document.addEventListener("keydown", (e) => {
-        // Only handle keyboard shortcuts if reading mode is active or file is loaded
         if (!rsvpSection.classList.contains("active")) return;
 
-        // Don't intercept keyboard shortcuts if the search input is focused
         const searchInput = document.getElementById("searchInput");
         if (document.activeElement === searchInput) {
-            // Only allow Enter to trigger search while in the search bar
             if (e.code === "Enter") {
                 e.preventDefault();
                 searchNextWord();
@@ -198,7 +219,6 @@ function setupKeyboardListeners() {
             return;
         }
 
-        // Spacebar: Pause/Resume
         if (e.code === "Space") {
             e.preventDefault();
             if (isReading) {
@@ -208,19 +228,16 @@ function setupKeyboardListeners() {
             }
         }
 
-        // Arrow Up/Right: Increase WPM
         if (e.code === "ArrowUp" || e.code === "ArrowRight") {
             e.preventDefault();
             adjustWPM(50);
         }
 
-        // Arrow Down/Left: Decrease WPM
         if (e.code === "ArrowDown" || e.code === "ArrowLeft") {
             e.preventDefault();
             adjustWPM(-50);
         }
 
-        // Enter: Start reading
         if (e.code === "Enter") {
             e.preventDefault();
             const startButton = document.getElementById("startButton");
@@ -229,7 +246,6 @@ function setupKeyboardListeners() {
             }
         }
 
-        // R: Reset
         if (e.code === "KeyR") {
             e.preventDefault();
             resetReading();
@@ -249,10 +265,13 @@ function adjustWPM(delta) {
 // ============================================================================
 
 async function startReading() {
+    if (event) event.preventDefault();
+
     if (words.length === 0) {
         showMessage("Please upload a file first", "error");
         return;
     }
+    
     isReading = true;
     isPaused = false;
     currentIndex = 0;
@@ -264,45 +283,115 @@ async function startReading() {
     // Auto-play music
     const musicPlayer = document.getElementById("musicPlayer");
     if (musicPlayer) {
-        musicPlayer.play().catch(err => console.log("Music autoplay not allowed or no music loaded"));
+        musicPlayer.play().catch(err => console.log("Music autoplay not allowed"));
     }
 
-    // 1. Get the TTS Audio and Timestamps
-    const response = await fetch(`${API_BASE_URL}/api/generate-tts`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ text: words.join(" "), wpm: currentWPM })
-    });
-    const data = await response.json();
-    
-    audioAlignment = data.alignment;
-    audioPlayer.src = data.audio_url;
+    sendEventToBackend("reading_started", { tts_enabled: ttsEnabled });
 
-    // 2. The Sync Engine: Listen to the audio and update RSVP
-    audioPlayer.ontimeupdate = () => {
-        const currentTimeMs = audioPlayer.currentTime * 1000;
+    // Choose reading mode
+    if (ttsEnabled) {
+        await startTTSMode(currentWPM);
+    } else {
+        displayNextWord();
+    }
+}
+
+async function startTTSMode(currentWPM) {
+    try {
+        isTTSMode = true;
+        showMessage("🎙️ Generating speech audio... Please wait", "success");
         
-        // Find which word matches the current audio playback time
-        const wordData = audioAlignment.find(item => 
-            currentTimeMs >= item.start_time_ms && currentTimeMs <= item.end_time_ms
-        );
-
-        if (wordData) {
-            const wordIndex = words.indexOf(wordData.word);
-            // If the word has changed, update the display
-            if (wordIndex !== -1 && wordIndex !== currentIndex) {
-                currentIndex = wordIndex;
-                processWordWithBackend(wordData.word); // Uses your existing focal logic
-                updateContextDisplay(); // Keeps preview/postview in sync
-            }
+        console.log("TTS Mode: Starting generation...");
+        console.log(`Text: ${words.length} words, WPM: ${currentWPM}`);
+        
+        const response = await fetch(`${API_BASE_URL}/api/generate-tts`, {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ 
+                text: words.join(" "), 
+                wpm: currentWPM 
+            })
+        });
+        
+        console.log("TTS Response status:", response.status);
+        
+        if (!response.ok) {
+            const errorText = await response.text();
+            console.error("TTS Response error:", errorText);
+            throw new Error(`TTS generation failed: ${response.status}`);
         }
-    };
+        
+        const data = await response.json();
+        console.log("TTS Response data:", data);
+        
+        if (data.status === "error") {
+            throw new Error(data.error || "Unknown TTS error");
+        }
+        
+        audioAlignment = data.alignment || [];
+        console.log(`Loaded ${audioAlignment.length} word alignments`);
+        
+        // Set audio source
+        audioPlayer.src = `${API_BASE_URL}${data.audio_url}`;
+        audioPlayer.src += `?t=${new Date().getTime()}`;
+        audioPlayer.load(); // Force the browser to fetch the new file
 
-    audioPlayer.play();
+        // Sync display to audio playback
+        audioPlayer.ontimeupdate = () => {
+            if (!isTTSMode || !isReading) return;
+            
+            const currentTimeMs = audioPlayer.currentTime * 1000;
+            
+            // Find the word that should be displayed at this time
+            for (let i = 0; i < audioAlignment.length; i++) {
+                const wordData = audioAlignment[i];
+                if (currentTimeMs >= wordData.start_time_ms && currentTimeMs <= wordData.end_time_ms) {
+                    // Find this word in our words array
+                    if (i !== currentIndex && i < words.length) {
+                        currentIndex = i;
+                        processWordWithBackend(words[i]);
+                        updateContextDisplay();
+                        document.getElementById("currentWord").textContent = currentIndex + 1;
+                        const progress = ((currentIndex + 1) / words.length) * 100;
+                        document.getElementById("progressFill").style.width = progress + "%";
+                    }
+                    break;
+                }
+            }
+        };
 
-    sendEventToBackend("reading_started");
+        audioPlayer.onended = () => {
+            console.log("TTS audio ended");
+            isReading = false;
+            isTTSMode = false;
+            document.getElementById("startButton").disabled = false;
+            document.getElementById("pauseButton").disabled = true;
+            document.getElementById("rsvpWord").textContent = "Finished!";
+            showMessage("Reading complete!", "success");
+        };
 
-    displayNextWord();
+        audioPlayer.onerror = (e) => {
+            console.error("Audio playback error:", e);
+            showMessage("Audio file not found or failed to load. Check backend console.", "error");
+            isReading = false;
+            document.getElementById("startButton").disabled = false;
+        };
+
+        console.log("Starting audio playback...");
+        await audioPlayer.play();
+        console.log("Audio is playing!");
+        showMessage("🔊 Speech playing - words synced to audio!", "success");
+        
+    } catch (error) {
+        console.error("TTS error:", error);
+        showMessage(`⚠️ TTS failed (${error.message}) - using timer mode instead`, "error");
+        isTTSMode = false;
+        ttsEnabled = false;
+        document.getElementById("ttsToggle").checked = false;
+        document.getElementById("ttsStatus").textContent = "";
+        // Fallback to normal reading
+        displayNextWord();
+    }
 }
 
 function pauseReading() {
@@ -312,6 +401,10 @@ function pauseReading() {
         clearTimeout(readingTimeout);
         document.getElementById("pauseButton").disabled = true;
         document.getElementById("resumeButton").disabled = false;
+
+        if (isTTSMode) {
+            audioPlayer.pause();
+        }
 
         sendEventToBackend("reading_paused");
     }
@@ -326,15 +419,22 @@ function resumeReading() {
 
         sendEventToBackend("reading_resumed");
 
-        displayNextWord();
+        if (isTTSMode) {
+            audioPlayer.play();
+        } else {
+            displayNextWord();
+        }
     }
 }
 
 function manualPauseReading() {
     if (isReading) {
         manualPause = true;
+        // Only pause music during MANUAL pauses
         const musicPlayer = document.getElementById("musicPlayer");
-        if (musicPlayer) { musicPlayer.pause(); }
+        if (musicPlayer && !musicPlayer.paused) { 
+            musicPlayer.pause(); 
+        }
         pauseReading();
     }
 }
@@ -342,9 +442,10 @@ function manualPauseReading() {
 function manualResumeReading() {
     if (isPaused && manualPause) {
         manualPause = false;
+        // Only resume music during MANUAL resumes
         const musicPlayer = document.getElementById("musicPlayer");
-        if (musicPlayer) { 
-            musicPlayer.play().catch(err => console.log("Music autoplay not allowed or no music loaded")); 
+        if (musicPlayer && musicPlayer.paused) { 
+            musicPlayer.play().catch(err => console.log("Music autoplay blocked")); 
         }
         resumeReading();
     }
@@ -355,7 +456,13 @@ function resetReading() {
     isPaused = false;
     currentIndex = 0;
     previewHistory = [];
+    isTTSMode = false;
     clearTimeout(readingTimeout);
+    
+    audioPlayer.pause();
+    audioPlayer.currentTime = 0;
+    audioAlignment = [];
+    
     document.getElementById("rsvpWord").textContent = "Ready?";
     document.getElementById("currentWord").textContent = "0";
     document.getElementById("progressFill").style.width = "0%";
@@ -364,7 +471,6 @@ function resetReading() {
     document.getElementById("pauseButton").disabled = true;
     document.getElementById("resumeButton").disabled = true;
 
-    // Pause music
     const musicPlayer = document.getElementById("musicPlayer");
     if (musicPlayer) {
         musicPlayer.pause();
@@ -381,7 +487,6 @@ function loadCustomMusic(event) {
     const musicPlayer = document.getElementById("musicPlayer");
     const fileURL = URL.createObjectURL(file);
     
-    // Remove old source and add new one
     const sources = musicPlayer.getElementsByTagName("source");
     if (sources.length > 0) {
         sources[0].src = fileURL;
@@ -401,15 +506,12 @@ function loadCustomMusic(event) {
 // ============================================================================
 
 function updateContextDisplay() {
-    const contextRadius = 10; // Show 10 words before and after
-
-    // Get surrounding words
+    const contextRadius = 10;
     const start = Math.max(0, currentIndex - contextRadius);
     const end = Math.min(words.length, currentIndex + contextRadius + 1);
     
     const contextWords = words.slice(start, end);
     
-    // Build HTML with current word highlighted and other words clickable
     const html = contextWords
         .map((word, idx) => {
             const actualIndex = start + idx;
@@ -430,7 +532,6 @@ function jumpToWord(index) {
     currentIndex = index;
     clearTimeout(readingTimeout);
     
-    // Update the display without resuming reading
     processWordWithBackend(words[index]);
     updateContextDisplay();
     document.getElementById("currentWord").textContent = index + 1;
@@ -452,14 +553,12 @@ function searchNextWord() {
         return;
     }
     
-    // Check if search term contains spaces
     if (searchTerm.includes(" ")) {
-        searchMessage.textContent = "Please search for only one word at a time. Multiple words are not supported.";
+        searchMessage.textContent = "Please search for only one word at a time";
         searchMessage.style.color = "#fca5a5";
         return;
     }
     
-    // Search from the next position onwards
     let foundIndex = -1;
     for (let i = currentIndex + 1; i < words.length; i++) {
         if (words[i].toLowerCase().includes(searchTerm)) {
@@ -468,7 +567,6 @@ function searchNextWord() {
         }
     }
     
-    // If not found in remaining words, wrap around to the beginning
     if (foundIndex === -1) {
         for (let i = 0; i <= currentIndex; i++) {
             if (words[i].toLowerCase().includes(searchTerm)) {
@@ -495,6 +593,9 @@ function searchNextWord() {
 }
 
 function displayNextWord() {
+    // Don't run timer-based display in TTS mode
+    if (isTTSMode) return;
+    
     if (!isReading || currentIndex >= words.length) {
         if (currentIndex >= words.length) {
             isReading = false;
@@ -507,41 +608,28 @@ function displayNextWord() {
     }
 
     const currentWord = words[currentIndex];
-    document.getElementById("rsvpWord").textContent = currentWord;
     document.getElementById("currentWord").textContent = currentIndex + 1;
 
     const progress = ((currentIndex + 1) / words.length) * 100;
     document.getElementById("progressFill").style.width = progress + "%";
 
-    // Update preview and postview
     updateContextDisplay();
+    processWordWithBackend(currentWord);
 
     currentIndex++;
 
-    // Send word to backend for processing
-    processWordWithBackend(currentWord);
-
-    // Calculate delay based on WPM
     const delayMs = 60000 / wordsPerMinute;
+    let extraPause = (currentWord.length * (delayMs / 1000)) * currentWord.length;
 
-    // Check for punctuation and add extra pause
-    // Also increases the pause with longer words
-    let extraPause = (currentWord.length * (delayMs / 1000)) * currentWord.length; // Exponential increase
-
-    if (
-        currentWord.includes(".") ||
-        currentWord.includes("!") ||
-        currentWord.includes("?") ||
-        currentWord.includes(";") ||
-        currentWord.includes(":")
-    ) {
-        extraPause += 100; // 100ms pause for sentence-ending punctuation
+    if (currentWord.includes(".") || currentWord.includes("!") || currentWord.includes("?") || 
+        currentWord.includes(";") || currentWord.includes(":")) {
+        extraPause += 100;
     } else if (currentWord.includes(",")) {
-        extraPause += 50; // 50ms pause for commas
+        extraPause += 50;
     }
 
     readingTimeout = setTimeout(() => {
-        if (isReading) {
+        if (isReading && !isTTSMode) {
             displayNextWord();
         }
     }, delayMs + extraPause);
@@ -582,11 +670,9 @@ async function processWordWithBackend(word) {
 
         const data = await response.json();
         
-        // Check if we got valid parts from the backend
         if (data.before !== undefined && data.focal !== undefined && data.after !== undefined) {
             renderWord(data.before, data.focal, data.after, data.focal_index);
         } else {
-            // Fallback to simple rendering if backend response is incomplete
             renderWordSimple(word);
         }
     } catch (error) {
@@ -599,7 +685,6 @@ function renderWord(before, focal, after, focalIndex) {
     const rsvpWordElement = document.getElementById("rsvpWord");
     const container = document.querySelector(".rsvp-container");
 
-    // Simple Regex to check if the word contains Arabic/Hebrew characters
     const rtlRegex = /[\u0590-\u08FF]/; 
     if (rtlRegex.test(before + focal + after)) {
         container.classList.add("rtl");
@@ -607,27 +692,22 @@ function renderWord(before, focal, after, focalIndex) {
         container.classList.remove("rtl");
     }
     
-    // Build HTML for 3-part word
     const html = `
         <span class="word-part before">${before}</span><span class="word-part focal">${focal}</span><span class="word-part after">${after}</span>
     `;
     
     rsvpWordElement.innerHTML = html;
-    // Focal letter is centered by the flexbox layout
     rsvpWordElement.style.transform = 'translateX(0)';
 }
 
 function renderWordSimple(word) {
     const rsvpWordElement = document.getElementById("rsvpWord");
     
-    // If backend response is invalid, display the whole word
-    // Find the focal character (usually middle letter)
     const focalIndex = Math.floor(word.length / 2);
     const before = word.substring(0, focalIndex);
     const focal = word[focalIndex];
     const after = word.substring(focalIndex + 1);
     
-    // Build HTML for 3-part word
     const html = `
         <span class="word-part before">${before}</span><span class="word-part focal">${focal}</span><span class="word-part after">${after}</span>
     `;
@@ -665,25 +745,29 @@ async function sendEventToBackend(eventType, additionalData = {}) {
     }
 }
 
+// ============================================================================
+// BLINK DETECTION INTEGRATION
+// ============================================================================
+
 setInterval(async () => {
     try {
         const res = await fetch(`${API_BASE_URL}/blink_state`);
         const data = await res.json();
 
-        // Only trigger if we are actually in the middle of a reading session
         if (data.state === "closed" && isReading && !isPaused) {
-            console.log("Blink detected: Pausing");
+            console.log("👁️ Blink detected: Pausing");
+            // Blink pauses do NOT pause music
             pauseReading();
         } 
         else if (data.state === "open" && isPaused && !manualPause) {
-            console.log("Eyes open: Resuming");
+            console.log("👁️ Eyes open: Resuming");
+            // Blink resumes do NOT resume music
             resumeReading();
         }
     } catch (err) {
-        // Silent fail if backend is down to avoid console spam
+        // Silent fail if backend down
     }
-}, 100); // 100ms (10 FPS) is usually enough and easier on the CPU
-
+}, 100);
 
 // ============================================================================
 // UI UTILITIES
