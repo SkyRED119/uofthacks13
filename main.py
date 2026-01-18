@@ -8,22 +8,23 @@ import io
 from langdetect import detect
 import os
 from elevenlabs import ElevenLabs
+from dotenv import load_dotenv
+
+load_dotenv()
 
 app = Flask(__name__)
 CORS(app)
 
 # Initialize ElevenLabs client
 # OPTION 1: Set your API key directly here for testing
-ELEVENLABS_API_KEY = os.getenv("ELEVENLABS_API_KEY") or "sk_c1a0a1014143028ce56521b3208df19ac5a7d7b52c82aadb"
+ELEVENLABS_API_KEY = os.getenv("ELEVENLABS_API_KEY")
 
 # Check if key is set
-if not ELEVENLABS_API_KEY or ELEVENLABS_API_KEY == "YOUR_API_KEY_HERE":
+if not ELEVENLABS_API_KEY:
     print("⚠️  WARNING: ELEVENLABS_API_KEY not set! TTS will not work.")
-    print("   Set it with: export ELEVENLABS_API_KEY='your_key_here'")
-    print("   Or replace YOUR_API_KEY_HERE in main.py")
     client = None
 else:
-    print(f"✅ ElevenLabs API key loaded: {ELEVENLABS_API_KEY[:10]}...")
+    print(f"✅ ElevenLabs API key loaded: {ELEVENLABS_API_KEY[:5]}***")
     client = ElevenLabs(api_key=ELEVENLABS_API_KEY)
 
 blink_state = "open"
