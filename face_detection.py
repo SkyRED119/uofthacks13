@@ -1,6 +1,5 @@
 import cv2
 import mediapipe as mp
-import numpy as np
 from scipy.spatial import distance as dist
 import requests
 
@@ -8,6 +7,8 @@ import requests
 EAR_THRESHOLD = 0.20 
 # We keep CONSECUTIVE_FRAMES at 1 for "instant" reading-stop response
 CONSECUTIVE_FRAMES = 1 
+
+API_URL = "http://localhost:5001/blink"
 
 LEFT_EYE = [362, 385, 387, 263, 373, 380]
 RIGHT_EYE = [33, 160, 158, 133, 153, 144]
@@ -29,6 +30,13 @@ blink_counter = 0
 eyes_already_closed = False # To prevent multiple triggers during a single blink
 
 print("Reading Tracker Active. Press 'ESC' to quit.")
+
+def send_blink(state):
+    try:
+        requests.post(API_URL, json={"state": state}, timeout=0.1)
+    except requests.exceptions.RequestException:
+        # This prevents the script from crashing if the server isn't running
+        pass
 
 while cap.isOpened():
     success, frame = cap.read()
@@ -54,7 +62,7 @@ while cap.isOpened():
                 blink_counter += 1
                 eyes_already_closed = True 
                 print(f"[ACTION] Eyes Closed! Total Blinks: {blink_counter}")
-                requests.post("http://localhost:5000/blink", json={"state": "closed"})
+                send_blink("closed")
             
             status_color = (0, 0, 255) # Red for "Closed"
             status_text = "EYES CLOSED - READING PAUSED"
@@ -66,7 +74,7 @@ while cap.isOpened():
             
             status_color = (0, 255, 0) # Green for "Open"
             status_text = "EYES OPEN - READING ACTIVE"
-            requests.post("http://localhost:5000/blink", json={"state": "open"})
+            send_blink("open")
 
         # Visual Feedback for the App
         cv2.putText(frame, status_text, (30, 50), 0, 0.8, status_color, 2)

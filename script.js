@@ -12,10 +12,13 @@ let words = [];
 let currentIndex = 0;
 let isReading = false;
 let isPaused = false;
+let manualPause = false;
 let readingTimeout = null;
 let wordsPerMinute = 300;
 let currentFileName = "";
 let previewHistory = []; // Track previous words for preview
+let audioAlignment = []; // Store [word, start_time, end_time]
+let audioPlayer = new Audio();
 
 // ============================================================================
 // DOM ELEMENTS
@@ -114,6 +117,12 @@ function handleTxtOrMd(file) {
                 file_name: file.name,
                 word_count: words.length,
             });
+
+            if (data.direction === "rtl") {
+                document.querySelector(".rsvp-container").classList.add("rtl");
+            } else {
+                document.querySelector(".rsvp-container").classList.remove("rtl");
+            }
         } catch (error) {
             showMessage("Error reading file: " + error.message, "error");
         }
@@ -193,9 +202,9 @@ function setupKeyboardListeners() {
         if (e.code === "Space") {
             e.preventDefault();
             if (isReading) {
-                pauseReading();
+                manualPauseReading();
             } else if (isPaused) {
-                resumeReading();
+                manualResumeReading();
             }
         }
 
@@ -239,7 +248,7 @@ function adjustWPM(delta) {
 // READING CONTROLS
 // ============================================================================
 
-function startReading() {
+async function startReading() {
     if (words.length === 0) {
         showMessage("Please upload a file first", "error");
         return;
@@ -250,11 +259,46 @@ function startReading() {
     document.getElementById("startButton").disabled = true;
     document.getElementById("pauseButton").disabled = false;
 
+    const currentWPM = parseInt(document.getElementById("speedSlider").value);
+
     // Auto-play music
     const musicPlayer = document.getElementById("musicPlayer");
     if (musicPlayer) {
         musicPlayer.play().catch(err => console.log("Music autoplay not allowed or no music loaded"));
     }
+
+    // 1. Get the TTS Audio and Timestamps
+    const response = await fetch(`${API_BASE_URL}/api/generate-tts`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ text: words.join(" "), wpm: currentWPM })
+    });
+    const data = await response.json();
+    
+    audioAlignment = data.alignment;
+    audioPlayer.src = data.audio_url;
+
+    // 2. The Sync Engine: Listen to the audio and update RSVP
+    audioPlayer.ontimeupdate = () => {
+        const currentTimeMs = audioPlayer.currentTime * 1000;
+        
+        // Find which word matches the current audio playback time
+        const wordData = audioAlignment.find(item => 
+            currentTimeMs >= item.start_time_ms && currentTimeMs <= item.end_time_ms
+        );
+
+        if (wordData) {
+            const wordIndex = words.indexOf(wordData.word);
+            // If the word has changed, update the display
+            if (wordIndex !== -1 && wordIndex !== currentIndex) {
+                currentIndex = wordIndex;
+                processWordWithBackend(wordData.word); // Uses your existing focal logic
+                updateContextDisplay(); // Keeps preview/postview in sync
+            }
+        }
+    };
+
+    audioPlayer.play();
 
     sendEventToBackend("reading_started");
 
@@ -269,12 +313,6 @@ function pauseReading() {
         document.getElementById("pauseButton").disabled = true;
         document.getElementById("resumeButton").disabled = false;
 
-        // Pause music
-        const musicPlayer = document.getElementById("musicPlayer");
-        if (musicPlayer) {
-            musicPlayer.pause();
-        }
-
         sendEventToBackend("reading_paused");
     }
 }
@@ -286,15 +324,29 @@ function resumeReading() {
         document.getElementById("pauseButton").disabled = false;
         document.getElementById("resumeButton").disabled = true;
 
-        // Resume music
-        const musicPlayer = document.getElementById("musicPlayer");
-        if (musicPlayer) {
-            musicPlayer.play().catch(err => console.log("Music autoplay not allowed or no music loaded"));
-        }
-
         sendEventToBackend("reading_resumed");
 
         displayNextWord();
+    }
+}
+
+function manualPauseReading() {
+    if (isReading) {
+        manualPause = true;
+        const musicPlayer = document.getElementById("musicPlayer");
+        if (musicPlayer) { musicPlayer.pause(); }
+        pauseReading();
+    }
+}
+
+function manualResumeReading() {
+    if (isPaused && manualPause) {
+        manualPause = false;
+        const musicPlayer = document.getElementById("musicPlayer");
+        if (musicPlayer) { 
+            musicPlayer.play().catch(err => console.log("Music autoplay not allowed or no music loaded")); 
+        }
+        resumeReading();
     }
 }
 
@@ -545,6 +597,15 @@ async function processWordWithBackend(word) {
 
 function renderWord(before, focal, after, focalIndex) {
     const rsvpWordElement = document.getElementById("rsvpWord");
+    const container = document.querySelector(".rsvp-container");
+
+    // Simple Regex to check if the word contains Arabic/Hebrew characters
+    const rtlRegex = /[\u0590-\u08FF]/; 
+    if (rtlRegex.test(before + focal + after)) {
+        container.classList.add("rtl");
+    } else {
+        container.classList.remove("rtl");
+    }
     
     // Build HTML for 3-part word
     const html = `
@@ -605,17 +666,23 @@ async function sendEventToBackend(eventType, additionalData = {}) {
 }
 
 setInterval(async () => {
-  const res = await fetch("http://localhost:5000/blink_state");
-  const data = await res.json();
+    try {
+        const res = await fetch(`${API_BASE_URL}/blink_state`);
+        const data = await res.json();
 
-  if (data.state === "closed" && !isPaused) {
-    pauseReading();
-  }
-
-  if (data.state === "open" && isPaused) {
-    resumeReading();
-  }
-}, 50); // 20 FPS, feels instant
+        // Only trigger if we are actually in the middle of a reading session
+        if (data.state === "closed" && isReading && !isPaused) {
+            console.log("Blink detected: Pausing");
+            pauseReading();
+        } 
+        else if (data.state === "open" && isPaused && !manualPause) {
+            console.log("Eyes open: Resuming");
+            resumeReading();
+        }
+    } catch (err) {
+        // Silent fail if backend is down to avoid console spam
+    }
+}, 100); // 100ms (10 FPS) is usually enough and easier on the CPU
 
 
 // ============================================================================

@@ -4,11 +4,18 @@ import json
 from datetime import datetime
 from pypdf import PdfReader
 import io
+from langdetect import detect
+import os
+from elevenlabs import Voice, VoiceSettings
+from elevenlabs.client import ElevenLabs
 
 app = Flask(__name__)
 CORS(app)  # Enable CORS for all routes
 
+client = ElevenLabs(api_key=os.getenv("ELEVENLABS_API_KEY"))
+
 blink_state = "open"
+current_direction = "ltr" # Default text direction is left-to-right
 
 # In-memory storage for events 
 events = []
@@ -44,8 +51,22 @@ def echo():
 
 @app.route("/api/extract-pdf", methods=["POST"])
 def extract_pdf():
+    global current_direction
     """Extract text from uploaded PDF file"""
     print("📄 /api/extract-pdf endpoint called", flush=True)
+    text = ""
+    
+    for page in pdf_reader.pages:
+        text += page.extract_text()
+
+        # Detect language of the whole text block
+        try:
+            lang = detect(text)
+            # Arabic (ar), Hebrew (he), Persian (fa), Urdu (ur) are RTL
+            current_direction = "rtl" if lang in ['ar', 'he', 'fa', 'ur'] else "ltr"
+        except:
+            current_direction = "ltr"
+
     try:
         # Check if file is in request
         if 'file' not in request.files:
@@ -81,6 +102,7 @@ def extract_pdf():
             return jsonify({
                 "status": "success",
                 "text": text,
+                "direction": current_direction,
                 "file_name": file.filename,
                 "pages": len(pdf_reader.pages)
             }), 200
@@ -208,6 +230,37 @@ def update_blink():
 def get_blink_state():
     return jsonify({"state": blink_state})
 
+
+@app.route("/api/generate-tts", methods=["POST"])
+def generate_tts():
+    data = request.get_json()
+    text = data.get('text', '')
+    user_wpm = data.get('wpm', 300)
+    
+    # Baseline: 150 WPM is ~1.0 speed. 300 WPM is 2.0 speed.
+    speaking_rate = max(0.5, min(2.0, user_wpm / 150))
+
+    try:
+        response = client.generate(
+            text=text,
+            voice=Voice(voice_id="EXAVIT97fihpW8w5XIyD"), # Bella voice
+            model="eleven_multilingual_v2",
+            voice_settings=VoiceSettings(speed=speaking_rate), # Syncs TTS speed to WPM
+            generation_config={"is_alignment_needed": True} # Critical for RSVP sync
+        )
+        
+        # Save the audio file to a folder named 'static'
+        audio_path = "static/speech.mp3"
+        with open(audio_path, "wb") as f:
+            for chunk in response.audio_stream:
+                f.write(chunk)
+
+        return jsonify({
+            "audio_url": f"http://localhost:5001/{audio_path}",
+            "alignment": response.alignment # List of [word, start_time_ms, end_time_ms]
+        })
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
 
 def main():
     app.run(debug=True, host="0.0.0.0", port=5001)
